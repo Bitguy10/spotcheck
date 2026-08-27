@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="SpotCheck">
+  <!--
+    SpotCheck mark: a location pin whose dot has been replaced by a live radar.
+    One asset, two ideas: "a place" (pin) + "a live signal" (pinging rings).
+    The same shape is used as the map pin throughout the app.
+  -->
+  <defs>
+    <linearGradient id="sc-vibe" x1="14" y1="7" x2="50" y2="57" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ECDC4"/>
+      <stop offset="0.52" stop-color="#FFD166"/>
+      <stop offset="1" stop-color="#FF5A5F"/>
+    </linearGradient>
+    <style>
+      @keyframes sc-ping-a { 0%   { r: 3.6;  opacity: .75 } 100% { r: 12.4; opacity: 0 } }
+      @keyframes sc-ping-b { 0%   { r: 3.6;  opacity: .55 } 100% { r: 12.4; opacity: 0 } }
+      @keyframes sc-breathe { 0%,100% { r: 3.1 } 50% { r: 3.7 } }
+      .sc-ring-a { animation: sc-ping-a 2.4s cubic-bezier(.22,.61,.36,1) infinite; }
+      .sc-ring-b { animation: sc-ping-b 2.4s cubic-bezier(.22,.61,.36,1) 1.2s infinite; }
+      .sc-dot    { animation: sc-breathe 2.4s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) {
+        .sc-ring-a, .sc-ring-b, .sc-dot { animation: none; }
+        .sc-ring-a { r: 8.4; opacity: .35 }
+        .sc-ring-b { r: 11.4; opacity: .18 }
+      }
+    </style>
+  </defs>
+
+  <!-- pin shell, filled with the vibe spectrum -->
+  <path d="M32 5.33C21.68 5.33 13.33 13.68 13.33 24c0 14 18.67 34.67 18.67 34.67S50.67 38 50.67 24c0-10.32-8.35-18.67-18.67-18.67z"
+        fill="url(#sc-vibe)"/>
+
+  <!-- radar screen -->
+  <circle cx="32" cy="24" r="13.2" fill="#12131A"/>
+
+  <!-- staggered sonar pings: teal then red -->
+  <circle class="sc-ring-a" cx="32" cy="24" r="3.6" fill="none" stroke="#4ECDC4" stroke-width="1.5"/>
+  <circle class="sc-ring-b" cx="32" cy="24" r="3.6" fill="none" stroke="#FF5A5F" stroke-width="1.5"/>
+
+  <!-- live dot -->
+  <circle class="sc-dot" cx="32" cy="24" r="3.1" fill="#FF5A5F"/>
+</svg>

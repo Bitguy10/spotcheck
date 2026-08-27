@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Static frame of the SpotCheck mark, used to rasterise app icons. -->
+  <defs>
+    <linearGradient id="sc-vibe" x1="14" y1="7" x2="50" y2="57" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4ECDC4"/>
+      <stop offset="0.52" stop-color="#FFD166"/>
+      <stop offset="1" stop-color="#FF5A5F"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="#12131A"/>
+  <path d="M32 5.33C21.68 5.33 13.33 13.68 13.33 24c0 14 18.67 34.67 18.67 34.67S50.67 38 50.67 24c0-10.32-8.35-18.67-18.67-18.67z"
+        fill="url(#sc-vibe)"/>
+  <circle cx="32" cy="24" r="13.2" fill="#12131A"/>
+  <circle cx="32" cy="24" r="8.4" fill="none" stroke="#4ECDC4" stroke-width="1.5" opacity="0.35"/>
+  <circle cx="32" cy="24" r="11.4" fill="none" stroke="#FF5A5F" stroke-width="1.5" opacity="0.18"/>
+  <circle cx="32" cy="24" r="3.3" fill="#FF5A5F"/>
+</svg>

@@ -1,0 +1,67 @@
+{
+  "expo": {
+    "name": "SpotCheck",
+    "slug": "spotcheck",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "spotcheck",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#12131A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.spotcheck.mobile",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "SpotCheck uses your location to show venues near you and to verify that you are physically at a venue before you can check in.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "app.spotcheck.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#12131A"
+      },
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Show venues near you and verify check-ins at the door."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#12131A",
+          "dark": {
+            "backgroundColor": "#12131A"
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_SUPABASE_URL": "",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": ""
+    }
+  }
+}
