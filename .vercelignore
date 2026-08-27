@@ -1,0 +1,11 @@
+# Keep the CLI upload lean and make sure nothing secret ships to the build.
+.env
+.env.*
+.vercel/
+node_modules/
+dist/
+.expo/
+.expo-shared/
+tools/
+tests/
+supabase/
