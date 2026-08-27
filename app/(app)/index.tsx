@@ -12,6 +12,7 @@ import { Modal, Platform, Pressable, RefreshControl, ScrollView, Text, TextInput
 import { router } from 'expo-router';
 
 import { Logo } from '@/components/Logo';
+import { PulseDot } from '@/components/PulseDot';
 import { FilterRow } from '@/components/FilterRow';
 import { PulseStripRow } from '@/components/PulseStripRow';
 import { VibeMap } from '@/components/VibeMap';
@@ -50,16 +51,22 @@ export default function Dashboard() {
   const prefs = usePrefs();
   const [radiusOverride, setRadiusOverride] = useState<number | null>(null);
   const radiusM = radiusOverride ?? prefs.radiusM;
-  const [explore, setExplore] = useState<(LatLng & { label: string }) | null>(null);
+  const [explore, setExplore] = useState<(LatLng & { label: string; query: string }) | null>(null);
   const [searchNote, setSearchNote] = useState<string | null>(null);
   const [exploring, setExploring] = useState(false);
   const center = explore ?? location.coords;
   const favorites = useFavorites();
 
+  // While an explored area is active and the search box still holds the area
+  // query, that text is a *place*, not a venue filter — don't let it hide the
+  // venues we just pulled for that area. Editing the box re-enables filtering.
+  const querySuppressed = !!explore && filters.query.trim() === explore.query;
+  const effectiveFilters = querySuppressed ? { ...filters, query: '' } : filters;
+
   const { venues, visible, loading, refresh, syncFromOSM, syncing, syncNote } = useVenues(
     center,
     radiusM,
-    filters,
+    effectiveFilters,
   );
 
   async function explorePlace() {
@@ -70,7 +77,7 @@ export default function Dashboard() {
     const g = await geocodePlace(q);
     setExploring(false);
     if (g) {
-      setExplore(g);
+      setExplore({ ...g, query: q });
       setRadiusOverride(null);
     } else {
       setSearchNote(`Couldn’t find “${q}” on the map.`);
@@ -78,6 +85,25 @@ export default function Dashboard() {
   }
 
   const displayed = savedOnly ? visible.filter((v) => favorites.ids.includes(v.id)) : visible;
+
+  const onPull = async () => {
+    setSearchNote(null);
+    await syncFromOSM();
+  };
+
+  // A little spice: a live vibe-mix strip summarising the current view.
+  const mix = useMemo(() => {
+    let chill = 0, mod = 0, hot = 0, quiet = 0, live = 0;
+    for (const v of displayed) {
+      const s = v.score;
+      if (s.value == null) { quiet += 1; continue; }
+      if (s.isLive) live += 1;
+      if (s.value < 40) chill += 1;
+      else if (s.value <= 70) mod += 1;
+      else hot += 1;
+    }
+    return { chill, mod, hot, quiet, live };
+  }, [displayed]);
 
   const nearest = useMemo(() => {
     let best = null as null | (typeof venues)[number];
@@ -123,7 +149,7 @@ export default function Dashboard() {
       {explore ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
           <Pressable
-            onPress={() => { setExplore(null); setSearchNote(null); }}
+            onPress={() => { setExplore(null); setSearchNote(null); setFilters((f) => ({ ...f, query: '' })); }}
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: theme.spectrum[0], borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 }}
           >
             <Text style={{ color: theme.spectrum[0], fontSize: 12, fontWeight: '700' }}>↩︎ Back to {location.areaLabel}</Text>
@@ -133,6 +159,49 @@ export default function Dashboard() {
       ) : null}
       {searchNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{searchNote}</Text> : null}
       {syncNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{syncNote}</Text> : null}
+
+      {displayed.length > 0 ? (
+        <View style={{ marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            {mix.live > 0 ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                <PulseDot color={theme.spectrum[0]} size={8} breathing />
+                <Text style={{ color: theme.spectrum[0], fontSize: 11, fontWeight: '700' }}>
+                  {mix.live} live now
+                </Text>
+              </View>
+            ) : (
+              <Text style={{ color: theme.faint, fontSize: 11 }}>quiet right now — a check-in starts a vibe</Text>
+            )}
+            <Text style={{ color: theme.faint, fontSize: 11, marginLeft: 'auto' }}>
+              {displayed.length} place{displayed.length === 1 ? '' : 's'}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', backgroundColor: theme.line }}>
+            {mix.chill > 0 ? <View style={{ flex: mix.chill, backgroundColor: theme.spectrum[0] }} /> : null}
+            {mix.mod > 0 ? <View style={{ flex: mix.mod, backgroundColor: theme.spectrum[1] }} /> : null}
+            {mix.hot > 0 ? <View style={{ flex: mix.hot, backgroundColor: theme.spectrum[2] }} /> : null}
+            {mix.quiet > 0 ? <View style={{ flex: mix.quiet, backgroundColor: theme.faint, opacity: 0.35 }} /> : null}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+            {(
+              [
+                [theme.spectrum[0], 'chill', mix.chill, 1],
+                [theme.spectrum[1], 'moderate', mix.mod, 1],
+                [theme.spectrum[2], 'hot', mix.hot, 1],
+                [theme.faint, 'quiet', mix.quiet, 0.5],
+              ] as const
+            ).map(([c, l, n, o]) => (
+              <View key={l} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: c, opacity: o }} />
+                <Text style={{ color: theme.faint, fontSize: 10 }}>
+                  {n} {l}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       {displayed.length === 0 && !loading ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
@@ -204,7 +273,7 @@ export default function Dashboard() {
             placeholderTextColor={theme.faint}
             style={{ flex: 1, color: theme.text, fontSize: 14 }}
           />
-          {filters.query.trim() && !explore ? (
+          {filters.query.trim() && !querySuppressed ? (
             <Pressable onPress={explorePlace} disabled={exploring} hitSlop={8}>
               <Text style={{ color: theme.spectrum[0], fontSize: 12, fontWeight: '700' }}>Explore ⏎</Text>
             </Pressable>
@@ -236,6 +305,23 @@ export default function Dashboard() {
         >
           <Text style={{ color: savedOnly ? theme.spectrum[2] : theme.muted, fontSize: 12, fontWeight: savedOnly ? '700' : '500' }}>
             ♥ Saved{favorites.ready ? ` · ${favorites.ids.length}` : ''}
+          </Text>
+        </Pressable>
+        <View style={{ flex: 1 }} />
+        <Pressable
+          onPress={onPull}
+          disabled={syncing}
+          style={{
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: theme.line,
+            opacity: syncing ? 0.6 : 1,
+          }}
+        >
+          <Text style={{ color: theme.muted, fontSize: 12, fontWeight: '500' }}>
+            {syncing ? 'Pulling…' : '↻ Pull OSM'}
           </Text>
         </Pressable>
       </View>
