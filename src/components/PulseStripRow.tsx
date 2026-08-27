@@ -50,6 +50,7 @@ export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
 
   return (
     <Pressable
+      testID={`venue-row-${venue.id}`}
       onPress={onPress}
       style={({ pressed }) => ({
         backgroundColor: pressed ? theme.subtle : theme.card,

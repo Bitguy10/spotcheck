@@ -32,7 +32,12 @@ export type VenuesState = {
   lastUpdated: number;
 };
 
-export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters): VenuesState {
+export function useVenues(
+  center: LatLng,
+  radiusM: number,
+  filters: VenueFilters,
+  userId?: string | null,
+): VenuesState {
   const [venues, setVenues] = useState<VenueWithVibe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +49,16 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   centerRef.current = center;
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
+  // Sandbox: every cached world belongs to one account — keys are scoped so a
+  // second login on this device can never hydrate the previous user's rows.
+  const scope = userId ?? 'anon';
+  const areaKey = (lat: number, lng: number) =>
+    `${scope}@${roundCoord(lat)},${roundCoord(lng)},${radiusM}`;
 
   /* -- initial load (stale-while-revalidate) -------------------------- */
   useEffect(() => {
     let alive = true;
-    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)},${radiusM}`;
+    const key = areaKey(center.lat, center.lng);
     setLoading(true);
     setError(null);
 
@@ -81,7 +91,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
       alive = false;
     };
     // Re-run when the viewer moves materially, not on every GPS jitter.
-  }, [roundCoord(center.lat), roundCoord(center.lng), radiusM, nonce]);
+  }, [roundCoord(center.lat), roundCoord(center.lng), radiusM, nonce, scope]);
 
   /* -- realtime ------------------------------------------------------ */
   useEffect(() => {
@@ -131,6 +141,12 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
   const doSync = useCallback(async () => {
+    if (!userId) {
+      // Sandbox mode: a pull with no account would write rows nobody can
+      // ever see. Say so instead of pretending it worked.
+      setSyncNote('Sign in first — pulled places land in your own world.');
+      return;
+    }
     setSyncing(true);
     setSyncNote(null);
     try {
@@ -151,10 +167,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
         );
         return;
       }
-      rememberVenues(
-        `${roundCoord(centerRef.current.lat)},${roundCoord(centerRef.current.lng)},${radiusM}`,
-        rows,
-      );
+      rememberVenues(areaKey(centerRef.current.lat, centerRef.current.lng), rows);
       setVenues(rows);
       setLastUpdated(Date.now());
       setSyncNote(
@@ -170,7 +183,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
     } finally {
       setSyncing(false);
     }
-  }, [radiusM]);
+  }, [radiusM, userId]);
 
   const syncFromOSM = useCallback(() => {
     void doSync();
@@ -179,7 +192,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   /* -- auto-discovery: an empty radius pulls real places once, silently -- */
   const autoTried = useRef<string>('');
   useEffect(() => {
-    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)},${radiusM}`;
+    const key = areaKey(center.lat, center.lng);
     if (!loading && venues.length === 0 && !syncing && autoTried.current !== key) {
       autoTried.current = key;
       void doSync();

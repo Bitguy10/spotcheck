@@ -75,6 +75,7 @@ function DashboardInner() {
     center,
     radiusM,
     effectiveFilters,
+    user?.id ?? null,
   );
 
   async function explorePlace() {

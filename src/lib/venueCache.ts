@@ -11,7 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { VenueWithVibe } from './types';
 
-const STORAGE_KEY = 'spotcheck.vcache.v1';
+const STORAGE_KEY = 'spotcheck.vcache.v2';
 const MAX_AREAS = 4;
 
 const mem = new Map<string, VenueWithVibe[]>();
