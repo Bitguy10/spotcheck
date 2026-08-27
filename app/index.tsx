@@ -7,7 +7,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import { router } from 'expo-router';
 
 import { Logo } from '@/components/Logo';
@@ -34,6 +34,10 @@ export default function Landing() {
   const { theme } = useTheme();
   const { user, mode, signOut } = useAuth();
   const { location, venues, live } = useLandingData();
+  const { width } = useWindowDimensions();
+  // Real viewport responsiveness (works on phones, tablets, resized browser
+  // windows) — never branch layout on Platform alone.
+  const wide = width >= 880;
 
   const heroRows = useMemo(() => {
     const scored = venues.visible.filter((v) => v.score.value !== null);
@@ -76,9 +80,9 @@ export default function Landing() {
             width: '100%',
             maxWidth: maxW,
             paddingHorizontal: 20,
-            flexDirection: isWeb ? 'row' : 'column',
-            alignItems: isWeb ? 'center' : 'stretch',
-            gap: isWeb ? 40 : 24,
+            flexDirection: wide ? 'row' : 'column',
+            alignItems: wide ? 'center' : 'stretch',
+            gap: wide ? 40 : 24,
             paddingTop: 32,
           }}
         >
@@ -90,8 +94,8 @@ export default function Landing() {
               style={{
                 color: theme.text,
                 fontFamily: 'SpaceGroteskBold',
-                fontSize: isWeb ? 44 : 34,
-                lineHeight: isWeb ? 48 : 40,
+                fontSize: wide ? 44 : 34,
+                lineHeight: wide ? 48 : 40,
                 letterSpacing: -1.5,
                 marginTop: 10,
               }}
@@ -111,7 +115,7 @@ export default function Landing() {
                 borderRadius: 14,
                 paddingVertical: 15,
                 paddingHorizontal: 22,
-                alignSelf: isWeb ? 'flex-start' : 'stretch',
+                alignSelf: wide ? 'flex-start' : 'stretch',
               }}
             >
               <Text style={{ color: '#0B1114', fontWeight: '700', fontSize: 16 }}>Check your first spot →</Text>
@@ -122,7 +126,7 @@ export default function Landing() {
           </View>
 
           {/* live pulse-strip demo */}
-          <View style={{ width: isWeb ? 380 : '100%' }}>
+          <View style={{ width: wide ? 380 : '100%' }}>
             <Text style={{ color: theme.muted, fontSize: 12, marginBottom: 8 }}>Happening near you</Text>
             {heroRows.length === 0 ? (
               <View style={{ backgroundColor: theme.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: theme.line }}>
@@ -165,22 +169,24 @@ export default function Landing() {
 
         {/* how it works */}
         <Section title="How it works" theme={theme}>
-          {[
-            ['1', 'Check in', 'We verify you\u2019re at the door with a quick GPS grace-radius check. No check-ins from the couch.'],
-            ['2', 'Tag the vibe', 'One tap on the red\u2194teal gauge. Optionally drop up to two flavor chips. No typing.'],
-            ['3', 'See it live', 'Your dot joins the venue\u2019s pulse instantly, then decays over ~45 minutes so the score is always now.'],
-          ].map(([n, h, b]) => (
-            <View key={n} style={{ flex: 1, minWidth: isWeb ? 220 : undefined, marginRight: 12, marginBottom: 12 }}>
-              <Text style={{ color: theme.spectrum[0], fontFamily: 'SpaceGroteskBold', fontSize: 26 }}>{n}</Text>
-              <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, marginTop: 6 }}>{h}</Text>
-              <Text style={{ color: theme.muted, fontSize: 14, lineHeight: 20, marginTop: 4 }}>{b}</Text>
-            </View>
-          ))}
+          <View style={{ flexDirection: wide ? 'row' : 'column', flexWrap: 'wrap', gap: 12 }}>
+            {[
+              ['1', 'Check in', 'We verify you\u2019re at the door with a quick GPS grace-radius check. No check-ins from the couch.'],
+              ['2', 'Tag the vibe', 'One tap on the red\u2194teal gauge. Optionally drop up to two flavor chips. No typing.'],
+              ['3', 'See it live', 'Your dot joins the venue\u2019s pulse instantly, then decays over ~45 minutes so the score is always now.'],
+            ].map(([n, h, b]) => (
+              <View key={n} style={{ flex: 1, minWidth: wide ? 220 : undefined }}>
+                <Text style={{ color: theme.spectrum[0], fontFamily: 'SpaceGroteskBold', fontSize: 26 }}>{n}</Text>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, marginTop: 6 }}>{h}</Text>
+                <Text style={{ color: theme.muted, fontSize: 14, lineHeight: 20, marginTop: 4 }}>{b}</Text>
+              </View>
+            ))}
+          </View>
         </Section>
 
         {/* why not reviews */}
         <Section title="Why not just reviews?" theme={theme}>
-          <View style={{ flexDirection: isWeb ? 'row' : 'column', gap: 12 }}>
+          <View style={{ flexDirection: wide ? 'row' : 'column', gap: 12 }}>
             <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: 16, borderWidth: 1, borderColor: theme.line, padding: 18 }}>
               <Text style={{ color: theme.faint, fontWeight: '700', fontSize: 13 }}>STAR RATINGS</Text>
               {['A lifetime average that forgets last night', 'Written later, by people who left', 'Gamed, scraped, and stale'].map(
@@ -248,7 +254,8 @@ function Section({ title, theme, children }: { title: string; theme: { text: str
       <Text style={{ color: theme.text, fontFamily: 'SpaceGroteskBold', fontSize: 22, letterSpacing: -0.5, marginBottom: 14 }}>
         {title}
       </Text>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>{children}</View>
+      {/* Children arrange themselves responsively; the map teaser stacks full-width. */}
+      <View style={{ flexDirection: 'column' }}>{children}</View>
     </View>
   );
 }
