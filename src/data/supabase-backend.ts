@@ -142,12 +142,20 @@ class SupabaseBackend implements SpotCheckBackend {
   /* -- venues ------------------------------------------------------- */
 
   async fetchVenues(center: LatLng, radiusM: number): Promise<VenueWithVibe[]> {
-    const { data, error } = await this.sb.rpc('venues_with_vibe', {
-      p_lat: center.lat,
-      p_lng: center.lng,
-      p_radius_m: radiusM,
-      p_limit: 200,
-    });
+    const call = () =>
+      this.sb.rpc('venues_with_vibe', {
+        p_lat: center.lat,
+        p_lng: center.lng,
+        p_radius_m: radiusM,
+        p_limit: 200,
+      });
+    let { data, error } = await call();
+    // Flaky mobile networks can race a request against a session refresh;
+    // refresh + one retry turns that blip into a non-event.
+    if (error && /401|jwt|token/i.test(error.message)) {
+      await this.sb.auth.refreshSession().catch(() => undefined);
+      ({ data, error } = await call());
+    }
     if (error) throw new Error(error.message);
     return ((data ?? []) as VibeRow[]).map((r) => ({
       ...rowToVenue(r),
