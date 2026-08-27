@@ -31,6 +31,14 @@ import { formatDistanceShort, type LatLng } from '@/lib/geo';
 const isWeb = Platform.OS === 'web';
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  // Each account gets a fresh dashboard instance — nothing from the
+  // previous signed-in user (saved list, explore state, strip) can
+  // survive a user switch while the nav stack keeps this screen mounted.
+  return <DashboardInner key={user?.id ?? 'anon'} />;
+}
+
+function DashboardInner() {
   const { theme } = useTheme();
   const { mode, user } = useAuth();
   const location = useLocation();
@@ -55,7 +63,7 @@ export default function Dashboard() {
   const [searchNote, setSearchNote] = useState<string | null>(null);
   const [exploring, setExploring] = useState(false);
   const center = explore ?? location.coords;
-  const favorites = useFavorites();
+  const favorites = useFavorites(user?.id ?? null);
 
   // While an explored area is active and the search box still holds the area
   // query, that text is a *place*, not a venue filter — don't let it hide the

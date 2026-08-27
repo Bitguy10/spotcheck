@@ -50,7 +50,7 @@ export default function VenueDetail() {
   const { user } = useAuth();
   const location = useLocation();
   const prefs = usePrefs();
-  const favorites = useFavorites();
+  const favorites = useFavorites(user?.id ?? null);
   const { venue, score, checkins, loading } = useVenueDetail(params.id);
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);

@@ -22,7 +22,7 @@ export default function Settings() {
   const { theme, preference, setPreference } = useTheme();
   const { user, signOut } = useAuth();
   const location = useLocation();
-  const favorites = useFavorites();
+  const favorites = useFavorites(user?.id ?? null);
   const prefs = usePrefs();
 
   const [busy, setBusy] = useState<null | 'pull' | 'purge' | 'password' | 'delete'>(null);
