@@ -219,7 +219,7 @@ export default function Dashboard() {
               <Text style={{ color: theme.muted, fontSize: 13 }}>Widen search to 5 km</Text>
             </Pressable>
           ) : null}
-          {filters.query.trim() ? (
+          {filters.query.trim() && !querySuppressed ? (
             <Pressable onPress={explorePlace} disabled={exploring} style={{ marginTop: 10, backgroundColor: theme.spectrum[0], borderRadius: 12, paddingVertical: 10, paddingHorizontal: 20 }}>
               <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
                 {exploring ? 'Finding…' : `Explore “${filters.query.trim()}”`}

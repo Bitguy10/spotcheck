@@ -41,6 +41,8 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   const [nonce, setNonce] = useState(0);
   const centerRef = useRef(center);
   centerRef.current = center;
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
   /* -- initial load -------------------------------------------------- */
   useEffect(() => {
@@ -120,17 +122,24 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
     setSyncNote(null);
     try {
       const backend = await getBackend();
-      const result = await backend.syncFromOSM(centerRef.current, radiusM);
+      // A pull is section-aware: with Bars/Food/Cafés/Clubs active we ask OSM
+      // for exactly those amenities, so the venues land in the section that
+      // pulled them.
+      const category = filtersRef.current.category;
+      const result = await backend.syncFromOSM(centerRef.current, radiusM, category);
       const rows = await backend.fetchVenues(centerRef.current, radiusM);
       setVenues(rows);
       setLastUpdated(Date.now());
       setSyncNote(
-        result.source === 'overpass'
-          ? `${result.inserted} venue${result.inserted === 1 ? '' : 's'} pulled from OpenStreetMap`
-          : `Serving ${result.inserted} cached venues`,
+        result.inserted === 0
+          ? 'OpenStreetMap has nothing for this section nearby — try Everything or widen the radius.'
+          : `${result.inserted} venue${result.inserted === 1 ? '' : 's'} pulled from OpenStreetMap`,
       );
     } catch (e) {
-      setSyncNote(e instanceof Error ? e.message : 'OpenStreetMap sync failed');
+      // Never surface raw "TypeError: Failed to fetch" — say what happened
+      // and what to do, keep the detail in the console.
+      console.warn('OSM sync failed', e);
+      setSyncNote('Couldn’t reach OpenStreetMap just now — check your connection and pull again.');
     } finally {
       setSyncing(false);
     }

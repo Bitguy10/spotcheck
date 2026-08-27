@@ -10,8 +10,8 @@
  * allowlist, and no locale gating anywhere in this file.
  */
 
-import { boundingBox, type LatLng } from '@/lib/geo';
-import type { Venue, VenueCategory } from '@/lib/types';
+import { boundingBox, distanceMeters, type LatLng } from '@/lib/geo';
+import type { CategoryFilter, Venue, VenueCategory } from '@/lib/types';
 
 const OVERPASS_ENDPOINTS = [
   'https://overpass-api.de/api/interpreter',
@@ -34,19 +34,42 @@ const OSM_TAGS: Record<string, VenueCategory> = {
   music_venue: 'event',
 };
 
-const AMENITY_REGEX = `^(bar|pub|nightclub|cafe|restaurant|biergarten|food_court|ice_cream|fast_food)$`;
+/** Which OSM amenity keys belong to each app section, so a pull made while a
+ *  section is active actually returns venues *for that section*. */
+const CATEGORY_AMENITIES: Record<Exclude<CategoryFilter, 'all'>, string[]> = {
+  bar: ['bar', 'pub', 'biergarten'],
+  pub: ['pub', 'bar', 'biergarten'],
+  cafe: ['cafe', 'ice_cream'],
+  restaurant: ['restaurant', 'fast_food', 'food_court'],
+  club: ['nightclub'],
+  event: ['events_venue', 'music_venue', 'nightclub'],
+  // "other" has no OSM discovery signature — pull everything instead.
+  other: [],
+};
+
+function amenitiesFor(category: CategoryFilter): string[] | null {
+  if (category === 'all') return null;
+  const list = CATEGORY_AMENITIES[category];
+  return list && list.length ? list : null;
+}
 
 export type OverpassVenue = Omit<Venue, 'id' | 'source' | 'expiresAt'> & { osmType: 'node' | 'way' | 'relation' };
 
-function buildQuery(center: LatLng, radiusM: number, limit: number): string {
+function buildQuery(center: LatLng, radiusM: number, limit: number, amenities: string[] | null): string {
   const box = boundingBox(center, radiusM);
+  const all = ['bar', 'pub', 'nightclub', 'cafe', 'restaurant', 'biergarten', 'food_court', 'ice_cream', 'fast_food'];
+  const amenityValues = (amenities ?? all).filter((v) => v !== 'nightclub');
+  const wantClubs = !amenities || amenities.includes('nightclub');
+  const around = `(around:${Math.round(radiusM)},${center.lat},${center.lng})`;
   // `around:` keeps the result set to a real circle; the bbox variant is what
   // the Postgres side uses for its index scan.
   const selectors = [
-    `node["amenity"~"${AMENITY_REGEX}"](around:${Math.round(radiusM)},${center.lat},${center.lng});`,
-    `way["amenity"~"${AMENITY_REGEX}"](around:${Math.round(radiusM)},${center.lat},${center.lng});`,
-    `node["leisure"="dance"](around:${Math.round(radiusM)},${center.lat},${center.lng});`,
-  ].join('\n  ');
+    amenityValues.length ? `node["amenity"~"^(${amenityValues.join('|')})$"]${around};` : null,
+    amenityValues.length ? `way["amenity"~"^(${amenityValues.join('|')})$"]${around};` : null,
+    wantClubs ? `node["leisure"="dance"]${around};` : null,
+  ]
+    .filter(Boolean)
+    .join('\n  ');
   return `[out:json][timeout:25];\n(\n  ${selectors}\n);\nout center tags ${limit};\n/* bbox ${box.south.toFixed(4)},${box.west.toFixed(4)},${box.north.toFixed(4)},${box.east.toFixed(4)} */`;
 }
 
@@ -107,45 +130,48 @@ type PhotonFeature = {
   properties?: { name?: string; osm_id?: number; street?: string; city?: string };
 };
 
-async function fetchPhotonVenues(center: LatLng, radiusM: number): Promise<OverpassVenue[]> {
+async function fetchPhotonVenues(
+  center: LatLng,
+  radiusM: number,
+  amenities: string[] | null,
+): Promise<OverpassVenue[]> {
   const km = Math.min(10, Math.max(1, Math.round(radiusM / 1000)));
+  const values = PHOTON_VALUES.filter(([v]) => !amenities || amenities.includes(v));
   const out: OverpassVenue[] = [];
   const seen = new Set<string>();
+  let failures = 0;
 
-  const results = await Promise.allSettled(
-    PHOTON_VALUES.map(async ([value, category]) => {
+  // Photon's public service asks for ~1 req/s. A parallel burst gets 429s
+  // (no CORS headers → "TypeError: Failed to fetch" in browsers), so go
+  // sequential with a small pause; a section-scoped pull only needs a few
+  // amenity types anyway.
+  for (const [value, category] of values) {
+    try {
       const url = `https://photon.komoot.io/reverse?lat=${center.lat}&lon=${center.lng}&radius=${km}&osm_tag=${encodeURIComponent(`amenity:${value}`)}&limit=50`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(9000) });
       if (!res.ok) throw new Error(`Photon ${res.status}`);
       const json = (await res.json()) as { features?: PhotonFeature[] };
-      const found: OverpassVenue[] = [];
       for (const f of json.features ?? []) {
         const p = f.properties ?? {};
         const [lng, lat] = f.geometry?.coordinates ?? [];
         const name = (p.name ?? '').trim();
         if (!name || lat == null || lng == null) continue;
+        // Photon's radius is a hint, not a circle — enforce the real one so
+        // everything we insert is something fetchVenues(radius) will return.
+        if (distanceMeters(center, { lat, lng }) > radiusM * 1.1) continue;
         const osmId = `node/${p.osm_id ?? `${lat.toFixed(5)},${lng.toFixed(5)}`}`;
+        if (seen.has(osmId)) continue;
+        seen.add(osmId);
         const street = [p.street, p.city].filter(Boolean).join(', ');
-        found.push({ name, lat, lng, category, osmId, address: street || null, osmType: 'node' });
+        out.push({ name, lat, lng, category, osmId, address: street || null, osmType: 'node' });
       }
-      return found;
-    }),
-  );
-
-  let failures = 0;
-  for (const r of results) {
-    if (r.status !== 'fulfilled') {
+    } catch {
       failures++;
-      continue;
     }
-    for (const v of r.value) {
-      const id = v.osmId ?? v.name;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      out.push(v);
-    }
+    await new Promise((r) => setTimeout(r, 150));
   }
-  if (out.length === 0 && failures === results.length) {
+
+  if (out.length === 0 && failures === values.length && values.length > 0) {
     throw new Error('all Photon requests failed');
   }
   return out;
@@ -186,8 +212,9 @@ async function fetchOverpassVenues(
   radiusM: number,
   limit: number,
   timeoutMs: number,
+  amenities: string[] | null,
 ): Promise<OverpassVenue[]> {
-  const query = buildQuery(center, radiusM, limit);
+  const query = buildQuery(center, radiusM, limit, amenities);
   // Race the mirrors in parallel under one budget: whichever answers first
   // with elements wins; a slow or blocked mirror no longer stalls the pull.
   const results = await Promise.allSettled(
@@ -239,10 +266,12 @@ export async function fetchOsmVenues(
   radiusM: number,
   limit = 300,
   timeoutMs = 9000,
+  category: CategoryFilter = 'all',
 ): Promise<OverpassVenue[]> {
+  const amenities = amenitiesFor(category);
   const [photon, overpass] = await Promise.allSettled([
-    fetchPhotonVenues(center, radiusM),
-    fetchOverpassVenues(center, radiusM, limit, timeoutMs),
+    fetchPhotonVenues(center, radiusM, amenities),
+    fetchOverpassVenues(center, radiusM, limit, timeoutMs, amenities),
   ]);
 
   const merged: OverpassVenue[] = [];

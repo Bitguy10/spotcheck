@@ -15,6 +15,7 @@ import type { LatLng } from '@/lib/geo';
 import type { VibeScore } from '@/lib/vibe';
 import type {
   AuthResult,
+  CategoryFilter,
   Checkin,
   CheckinResult,
   CheckinSubmittedEvent,
@@ -41,7 +42,7 @@ export interface SpotCheckBackend {
      Scores arrive already computed by the server; the client only sorts them. */
   fetchVenues(center: LatLng, radiusM: number): Promise<VenueWithVibe[]>;
   getVenue(id: string): Promise<Venue | null>;
-  syncFromOSM(center: LatLng, radiusM: number): Promise<OsmSyncResult>;
+  syncFromOSM(center: LatLng, radiusM: number, category?: CategoryFilter): Promise<OsmSyncResult>;
 
   /* vibe — always server-computed. The client never authors a public score. */
   getVibe(venueId: string): Promise<VibeScore>;

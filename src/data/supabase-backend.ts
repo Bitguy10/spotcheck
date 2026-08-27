@@ -22,6 +22,7 @@ import { isKnownTag } from '@/lib/tags';
 import type {
   AuthResult,
   AuthUser,
+  CategoryFilter,
   Checkin,
   CheckinResult,
   CheckinSubmittedEvent,
@@ -194,11 +195,11 @@ class SupabaseBackend implements SpotCheckBackend {
    * (CORS-friendly), then the `upsert_osm_venues` RPC normalises + writes it so
    * the service key never leaves the server and the shape stays validated.
    */
-  async syncFromOSM(center: LatLng, radiusM: number): Promise<OsmSyncResult> {
+  async syncFromOSM(center: LatLng, radiusM: number, category: CategoryFilter = 'all'): Promise<OsmSyncResult> {
     // Errors propagate: the UI prefers an honest "discovery failed" note over a
     // silent "serving 0 cached venues".
     const { fetchOsmVenues } = await import('./overpass');
-    const raw = await fetchOsmVenues(center, radiusM, 250);
+    const raw = await fetchOsmVenues(center, radiusM, 250, 9000, category);
     const rows = raw.map((v) => ({
       name: v.name,
       lat: v.lat,
