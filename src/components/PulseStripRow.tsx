@@ -54,23 +54,30 @@ export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
       style={({ pressed }) => ({
         backgroundColor: pressed ? theme.subtle : theme.card,
         borderRadius: 18,
-        borderWidth: 1,
-        borderColor: theme.line,
+        // Catchy but honest: scored rows get a vibe-coloured border, quiet
+        // rows a clearly visible neutral one. Never dim the whole card —
+        // a discovered place must stay readable in light *and* dark mode.
+        borderWidth: hasScore ? 1.5 : 1,
+        borderColor: hasScore ? `${accent}88` : theme.line,
         padding: 14,
         marginBottom: 10,
-        opacity: stale ? 0.55 : 1,
+        shadowColor: '#000',
+        shadowOpacity: pressed ? 0.05 : 0.09,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 2,
       })}
       accessibilityRole="button"
       accessibilityLabel={`${venue.name}, ${label}`}
     >
       {/* line 1 — identity */}
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <PulseDot color={hasScore ? vibeColor(score.value) : theme.faint} size={8} breathing={live} />
+        <PulseDot color={hasScore ? vibeColor(score.value) : theme.muted} size={8} breathing={live} />
         <Text
           numberOfLines={1}
           style={{
             flex: 1,
-            color: stale ? theme.faint : theme.text,
+            color: theme.text,
             fontFamily: 'SpaceGrotesk',
             fontWeight: '600',
             fontSize: 16,
@@ -84,10 +91,12 @@ export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
             <Text style={{ color: theme.spectrum[1], fontSize: 10, fontWeight: '700' }}>EVENT · {formatTtl(venue.expiresAt, now)}</Text>
           </View>
         ) : null}
-        <Text style={{ color: theme.muted, fontSize: 12 }}>
-          {CATEGORY_EMOJI[venue.category] ?? '📍'}
-          {venue.distanceMeters != null ? ` · ${formatDistanceShort(venue.distanceMeters, prefs.units)}` : ''}
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.subtle, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+          <Text style={{ fontSize: 12 }}>{CATEGORY_EMOJI[venue.category] ?? '📍'}</Text>
+          <Text style={{ color: theme.muted, fontSize: 12, fontWeight: '600' }}>
+            {venue.distanceMeters != null ? formatDistanceShort(venue.distanceMeters, prefs.units) : ''}
+          </Text>
+        </View>
       </View>
 
       {/* line 2 — the gauge (the row itself) */}
@@ -97,7 +106,7 @@ export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
 
       {/* line 3 — meta */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 9 }}>
-        <Text style={{ color: accent, fontSize: 12, fontWeight: hasScore ? '700' : '500' }}>
+        <Text style={{ color: hasScore ? accent : theme.muted, fontSize: 12, fontWeight: hasScore ? '700' : '600' }}>
           {label}
         </Text>
         <Text style={{ color: theme.muted, fontSize: 12 }}>
