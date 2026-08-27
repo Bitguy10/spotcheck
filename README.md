@@ -163,6 +163,39 @@ react-native-maps tiles; on production web swap in Leaflet / Mapbox GL JS.
   once expired. `supabase/migrations/0004_growth.sql`. `tools/backfill-history.mjs` seeds a believable
   multi-week history for demos.
 
+## Deploy to Vercel
+
+The web target is a static export, so Vercel runs no server — `vercel.json` already declares the
+build:
+
+| Setting | Value |
+| --- | --- |
+| Framework preset | Other |
+| Build command | `npx expo export --platform web` |
+| Output directory | `dist` |
+| Node.js version | 20 (`.nvmrc`, `engines` in `package.json`) |
+
+Set these as **build** environment variables. Metro inlines every `EXPO_PUBLIC_*` value at export
+time, so setting them as runtime-only variables has no effect on the bundle:
+
+* `EXPO_PUBLIC_SUPABASE_URL`
+* `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+
+```bash
+npm i -g vercel
+vercel link                                              # or: vercel link --project spotcheck
+vercel env add EXPO_PUBLIC_SUPABASE_URL production
+vercel env add EXPO_PUBLIC_SUPABASE_ANON_KEY production
+vercel --prod
+```
+
+Then in Supabase → Authentication → URL Configuration, add the deployed URL as the **Site URL**
+(and to the redirect allow-list) or auth redirects will land on localhost.
+
+`dist/` is git-ignored, so every push rebuilds. The catch-all rewrite sends unknown paths to
+`index.html`, which is what lets deep links like `/venue/<id>` resolve client-side — the same
+fallback `tools/serve-dist.mjs` provides locally.
+
 ## Explicitly deferred (later waves)
 
 Advanced filters, push notifications, owner claims, streaks / reputation, friends/following,
