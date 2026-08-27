@@ -143,12 +143,12 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   /* -- auto-discovery: an empty radius pulls real places once, silently -- */
   const autoTried = useRef<string>('');
   useEffect(() => {
-    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)}`;
+    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)},${radiusM}`;
     if (!loading && venues.length === 0 && !syncing && autoTried.current !== key) {
       autoTried.current = key;
       void doSync();
     }
-  }, [loading, venues.length, syncing, center.lat, center.lng, doSync]);
+  }, [loading, venues.length, syncing, center.lat, center.lng, radiusM, doSync]);
 
   const applyOptimistic = useCallback((venueId: string, mine: Checkin) => {
     setVenues((prev) =>

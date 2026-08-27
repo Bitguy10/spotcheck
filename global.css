@@ -29,3 +29,22 @@ body {
   background: #4ecdc4;
   color: #12131a;
 }
+
+/* Leaflet recenter control (custom button styled like the zoom control). */
+.sc-recenter {
+  width: 34px;
+  height: 34px;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #0f9e93;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+.sc-recenter:active {
+  background: #f0f0f0;
+}

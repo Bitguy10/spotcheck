@@ -44,11 +44,13 @@ export default function Dashboard() {
   const [view, setView] = useState<'list' | 'map'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savedOnly, setSavedOnly] = useState(false);
+  const [radiusOverride, setRadiusOverride] = useState<number | null>(null);
+  const radiusM = radiusOverride ?? location.radiusM;
   const favorites = useFavorites();
 
   const { venues, visible, loading, refresh, syncFromOSM, syncing, syncNote } = useVenues(
     location.coords,
-    location.radiusM,
+    radiusM,
     filters,
   );
 
@@ -98,13 +100,18 @@ export default function Dashboard() {
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
           <Logo size={40} animate={false} />
           <Text style={{ color: theme.muted, fontSize: 14, marginTop: 14, textAlign: 'center' }}>
-            Nothing matches here yet.
+            Nothing within {Math.round(radiusM / 100) / 10} km yet.
           </Text>
           <Pressable onPress={syncFromOSM} style={{ marginTop: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 }} disabled={syncing}>
             <Text style={{ color: theme.spectrum[0], fontWeight: '600', fontSize: 13 }}>
               {syncing ? 'Pulling from OpenStreetMap…' : 'Pull venues from OpenStreetMap'}
             </Text>
           </Pressable>
+          {radiusM < 5000 ? (
+            <Pressable onPress={() => setRadiusOverride(5000)} style={{ marginTop: 8, paddingVertical: 8, paddingHorizontal: 14 }}>
+              <Text style={{ color: theme.muted, fontSize: 13 }}>Widen search to 5 km</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : (
         displayed.map((v) => <PulseStripRow key={v.id} venue={v} onPress={() => openVenue(v.id)} />)
@@ -116,7 +123,7 @@ export default function Dashboard() {
     <VibeMap
       venues={displayed.slice(0, 60)}
       center={location.coords}
-      radiusM={location.radiusM}
+      radiusM={radiusM}
       selectedId={selectedId}
       onSelect={openVenue}
       style={{ flex: 1, borderWidth: 1, borderColor: theme.line }}

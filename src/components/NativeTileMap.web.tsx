@@ -1,9 +1,9 @@
 /**
- * Web map surface: real tiles via Leaflet + OpenStreetMap.
- *
- * Venues render as brand-coloured pins (vibe scale), the viewer as a teal dot
- * with the discovery radius as a dashed ring. Tiles dim in dark mode via a CSS
- * filter on the tile pane only, so pins keep their true colours.
+ * Web map surface: Leaflet with a Google-Maps-grade basemap (Esri World Street
+ * Map — keyless, clean labels; dimmed via a tile-pane filter in dark mode so
+ * pins keep their true colours). Venues render as teardrop pins on the vibe
+ * scale, the viewer as a teal dot with the discovery radius as a dashed ring,
+ * plus a recenter control.
  */
 
 import React, { useEffect, useRef } from 'react';
@@ -24,11 +24,20 @@ type Props = {
   style?: object;
 };
 
+const TILES = {
+  url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  attribution:
+    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &middot; Tiles &copy; Esri',
+} as const;
+
 export function NativeTileMap({ venues, center, radiusM, selectedId, onSelect }: Props) {
   const holder = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
+  const tilesRef = useRef<L.TileLayer | null>(null);
   const markersRef = useRef<L.LayerGroup | null>(null);
   const overlayRef = useRef<{ circle: L.Circle; me: L.CircleMarker } | null>(null);
+  const centerRef = useRef(center);
+  centerRef.current = center;
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
   const { mode } = useTheme();
@@ -38,14 +47,32 @@ export function NativeTileMap({ venues, center, radiusM, selectedId, onSelect }:
     const el = holder.current;
     if (!el || mapRef.current) return;
 
-    const map = L.map(el, { zoomControl: true, attributionControl: true, worldCopyJump: true });
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
+    const map = L.map(el, {
+      zoomControl: false,
+      attributionControl: true,
+      worldCopyJump: true,
+    });
+    L.control.zoom({ position: 'bottomright' }).addTo(map);
     markersRef.current = L.layerGroup().addTo(map);
     map.setView([center.lat, center.lng], 14);
     mapRef.current = map;
+
+    // Recenter control — the "where am I" button people expect from map apps.
+    const Recenter = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: () => {
+        const btn = L.DomUtil.create('button', 'sc-recenter');
+        btn.setAttribute('aria-label', 'Center on my location');
+        btn.innerHTML =
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="7.5" stroke="currentColor" stroke-width="2"/></svg>';
+        L.DomEvent.disableClickPropagation(btn);
+        L.DomEvent.on(btn, 'click', () => {
+          map.setView([centerRef.current.lat, centerRef.current.lng], 15);
+        });
+        return btn as unknown as HTMLElement;
+      },
+    });
+    map.addControl(new Recenter());
 
     // RNW settles layout a beat after mount; keep the map sized correctly.
     const t = setTimeout(() => map.invalidateSize(), 60);
@@ -57,11 +84,30 @@ export function NativeTileMap({ venues, center, radiusM, selectedId, onSelect }:
       ro?.disconnect();
       map.remove();
       mapRef.current = null;
+      tilesRef.current = null;
       markersRef.current = null;
       overlayRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /* -- basemap ---------------------------------------------------------- */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || tilesRef.current) return;
+    tilesRef.current = L.tileLayer(TILES.url, { maxZoom: 19, attribution: TILES.attribution }).addTo(map);
+  }, []);
+
+  /* -- dim tiles in dark mode; pins stay true-coloured ------------------ */
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const pane = map.getContainer().querySelector<HTMLElement>('.leaflet-tile-pane');
+    if (pane) {
+      pane.style.filter =
+        mode === 'dark' ? 'invert(1) hue-rotate(180deg) brightness(0.88) contrast(0.92) saturate(0.45)' : '';
+    }
+  }, [mode]);
 
   /* -- follow the viewer when they move materially -------------------- */
   useEffect(() => {
@@ -107,28 +153,17 @@ export function NativeTileMap({ venues, center, radiusM, selectedId, onSelect }:
       const color = vibeColor(v.score.value, mode);
       const icon = L.divIcon({
         className: 'sc-pin',
-        html: `<div style="width:20px;height:20px;transform:rotate(-45deg);border-radius:50% 50% 50% 4px;background:${color};border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.45)"></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        html: `<div style="width:24px;height:24px;transform:rotate(-45deg);border-radius:50% 50% 50% 4px;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center"><div style="width:7px;height:7px;border-radius:50%;background:#fff"></div></div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
       const m = L.marker([v.lat, v.lng], { icon, keyboard: false });
-      m.bindTooltip(v.name, { direction: 'top', offset: [0, -8] });
+      m.bindTooltip(v.name, { direction: 'top', offset: [0, -10] });
       if (onSelectRef.current) m.on('click', () => onSelectRef.current?.(v.id));
       m.addTo(group);
       if (v.id === selectedId) m.openTooltip();
     }
   }, [venues, selectedId, mode]);
-
-  /* -- dim tiles in dark mode, keep pins true-coloured ----------------- */
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const pane = map.getContainer().querySelector<HTMLElement>('.leaflet-tile-pane');
-    if (pane) {
-      pane.style.filter =
-        mode === 'dark' ? 'invert(1) hue-rotate(180deg) brightness(0.86) contrast(0.9) saturate(0.5)' : '';
-    }
-  }, [mode, venues.length]);
 
   return (
     <div
