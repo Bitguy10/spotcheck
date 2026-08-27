@@ -187,24 +187,22 @@ class SupabaseBackend implements SpotCheckBackend {
    * the service key never leaves the server and the shape stays validated.
    */
   async syncFromOSM(center: LatLng, radiusM: number): Promise<OsmSyncResult> {
-    try {
-      const { fetchOsmVenues } = await import('./overpass');
-      const raw = await fetchOsmVenues(center, radiusM, 250);
-      const rows = raw.map((v) => ({
-        name: v.name,
-        lat: v.lat,
-        lng: v.lng,
-        category: v.category,
-        osm_id: v.osmId,
-        address: v.address,
-      }));
-      const { data, error } = await this.sb.rpc('upsert_osm_venues', { p_rows: rows });
-      if (error) return { inserted: 0, skipped: 0, source: 'cache' };
-      const d = data as { inserted?: number; skipped?: number };
-      return { inserted: d?.inserted ?? rows.length, skipped: d?.skipped ?? 0, source: 'overpass' };
-    } catch {
-      return { inserted: 0, skipped: 0, source: 'cache' };
-    }
+    // Errors propagate: the UI prefers an honest "discovery failed" note over a
+    // silent "serving 0 cached venues".
+    const { fetchOsmVenues } = await import('./overpass');
+    const raw = await fetchOsmVenues(center, radiusM, 250);
+    const rows = raw.map((v) => ({
+      name: v.name,
+      lat: v.lat,
+      lng: v.lng,
+      category: v.category,
+      osm_id: v.osmId,
+      address: v.address,
+    }));
+    const { data, error } = await this.sb.rpc('upsert_osm_venues', { p_rows: rows });
+    if (error) throw new Error(error.message);
+    const d = data as { inserted?: number; skipped?: number };
+    return { inserted: d?.inserted ?? rows.length, skipped: d?.skipped ?? 0, source: 'overpass' };
   }
 
   /* -- vibe --------------------------------------------------------- */

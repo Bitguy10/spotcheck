@@ -1,10 +1,11 @@
 /**
  * Chooses the map surface:
+ *   · web                                   → Leaflet with real OSM tiles
  *   · native + EXPO_PUBLIC_USE_NATIVE_MAPS=1 → react-native-maps (real tiles)
- *   · everywhere else                         → offline schematic SVG map
+ *   · native otherwise                       → offline schematic SVG map
  *
- * The schematic map keeps the web preview and offline runs fully usable while
- * still encoding the same coordinates + vibe colour scale.
+ * The schematic map keeps offline/native runs fully usable while encoding the
+ * same coordinates + vibe colour scale.
  */
 
 import React from 'react';
@@ -27,7 +28,7 @@ type VibeMapProps = {
 };
 
 export function VibeMap(props: VibeMapProps) {
-  const real = Platform.OS !== 'web' && useNativeMaps;
+  const real = Platform.OS === 'web' || useNativeMaps;
   return (
     <View style={[{ overflow: 'hidden', borderRadius: 18 }, props.style]}>
       {real ? <NativeTileMap {...props} /> : <SchematicMap {...props} />}

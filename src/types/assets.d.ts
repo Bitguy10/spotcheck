@@ -11,3 +11,7 @@ declare module '*.png' {
   const src: number;
   export default src;
 }
+declare module '*.css' {
+  const src: string;
+  export default src;
+}

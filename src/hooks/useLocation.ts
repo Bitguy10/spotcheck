@@ -80,9 +80,14 @@ export function useLocation(radiusM: number = DISCOVERY_RADIUS_M): LocationState
         setCoords(next);
         setAccuracy(fix.coords.accuracy ?? null);
         setStatus('located');
-        setAreaLabel('Finding your area…');
+        setAreaLabel('Your area');
 
-        const label = await reverseGeocode(next);
+        // Reverse-geocode is best-effort: never leave "Finding your area…" on
+        // screen when it is slow or unsupported (mobile web often is).
+        const label = await Promise.race([
+          reverseGeocode(next),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+        ]);
         if (!cancelled && label) setAreaLabel(label);
 
         // A live watch feed keeps the check-in gate's distance honest as you

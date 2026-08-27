@@ -115,7 +115,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   /* -- actions ------------------------------------------------------- */
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
-  const syncFromOSM = useCallback(async () => {
+  const doSync = useCallback(async () => {
     setSyncing(true);
     setSyncNote(null);
     try {
@@ -126,7 +126,7 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
       setLastUpdated(Date.now());
       setSyncNote(
         result.source === 'overpass'
-          ? `${result.inserted} venues pulled from OpenStreetMap`
+          ? `${result.inserted} venue${result.inserted === 1 ? '' : 's'} pulled from OpenStreetMap`
           : `Serving ${result.inserted} cached venues`,
       );
     } catch (e) {
@@ -135,6 +135,20 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
       setSyncing(false);
     }
   }, [radiusM]);
+
+  const syncFromOSM = useCallback(() => {
+    void doSync();
+  }, [doSync]);
+
+  /* -- auto-discovery: an empty radius pulls real places once, silently -- */
+  const autoTried = useRef<string>('');
+  useEffect(() => {
+    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)}`;
+    if (!loading && venues.length === 0 && !syncing && autoTried.current !== key) {
+      autoTried.current = key;
+      void doSync();
+    }
+  }, [loading, venues.length, syncing, center.lat, center.lng, doSync]);
 
   const applyOptimistic = useCallback((venueId: string, mine: Checkin) => {
     setVenues((prev) =>
