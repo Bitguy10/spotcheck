@@ -27,8 +27,12 @@ export function matchesCategory(venue: VenueWithVibe, filter: CategoryFilter): b
 export function matchesVibe(venue: VenueWithVibe, filter: VenueFilters['vibe']): boolean {
   if (filter === 'all') return true;
   const bucket = vibeBucket(venue.score.value);
-  // A venue with no published score can't claim a bucket, so it drops out of a
-  // bucket filter — it stays visible under "All".
+  // A venue with no published score yet is a discovered *place*, not a vibe
+  // match — but hiding freshly pulled venues from every section made pulls
+  // look broken. Quiet venues therefore stay visible in every vibe section
+  // (rows render dimmed, so "no vibe yet" still reads at a glance); only
+  // scored venues are genuinely filtered by bucket.
+  if (bucket === null) return true;
   return bucket === filter;
 }
 

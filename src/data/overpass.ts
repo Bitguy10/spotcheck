@@ -97,6 +97,9 @@ const PHOTON_VALUES: Array<[string, VenueCategory]> = [
   ['bar', 'bar'],
   ['pub', 'pub'],
   ['nightclub', 'club'],
+  ['ice_cream', 'cafe'],
+  ['food_court', 'restaurant'],
+  ['biergarten', 'bar'],
 ];
 
 type PhotonFeature = {
@@ -178,54 +181,93 @@ export async function geocodePlace(q: string): Promise<(LatLng & { label: string
  * blocked). Throws only when *both* fail; callers decide whether to fall back
  * to cached rows or seed data.
  */
+async function fetchOverpassVenues(
+  center: LatLng,
+  radiusM: number,
+  limit: number,
+  timeoutMs: number,
+): Promise<OverpassVenue[]> {
+  const query = buildQuery(center, radiusM, limit);
+  // Race the mirrors in parallel under one budget: whichever answers first
+  // with elements wins; a slow or blocked mirror no longer stalls the pull.
+  const results = await Promise.allSettled(
+    OVERPASS_ENDPOINTS.map(async (endpoint) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `data=${encodeURIComponent(query)}`,
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`Overpass ${res.status}`);
+        const json = (await res.json()) as { elements?: RawElement[] };
+        const seen = new Set<string>();
+        const out: OverpassVenue[] = [];
+        for (const el of json.elements ?? []) {
+          const v = normalize(el);
+          if (!v || !v.osmId || seen.has(v.osmId)) continue;
+          seen.add(v.osmId);
+          out.push(v);
+        }
+        if (out.length === 0) throw new Error('Overpass empty');
+        return out;
+      } finally {
+        clearTimeout(timer);
+      }
+    }),
+  );
+  for (const r of results) {
+    if (r.status === 'fulfilled') return r.value;
+  }
+  throw new Error('all Overpass mirrors failed');
+}
+
+function dedupeKey(v: OverpassVenue): string {
+  return `${v.name.toLowerCase()}|${v.lat.toFixed(4)},${v.lng.toFixed(4)}`;
+}
+
+/**
+ * Discover venues from BOTH sources in parallel and merge: Photon (fast,
+ * CORS-open, reliable) plus Overpass (richer — ways + more categories) when a
+ * mirror answers within budget. Throws only when *both* fail; callers decide
+ * whether to fall back to cached rows or seed data.
+ */
 export async function fetchOsmVenues(
   center: LatLng,
   radiusM: number,
   limit = 300,
-  timeoutMs = 10000,
+  timeoutMs = 9000,
 ): Promise<OverpassVenue[]> {
-  let photonError: unknown = null;
-  try {
-    const viaPhoton = await fetchPhotonVenues(center, radiusM);
-    if (viaPhoton.length > 0) return viaPhoton;
-  } catch (err) {
-    photonError = err;
-  }
+  const [photon, overpass] = await Promise.allSettled([
+    fetchPhotonVenues(center, radiusM),
+    fetchOverpassVenues(center, radiusM, limit, timeoutMs),
+  ]);
 
-  const query = buildQuery(center, radiusM, limit);
-  let overpassError: unknown = null;
-
-  for (const endpoint of OVERPASS_ENDPOINTS) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`Overpass ${res.status}`);
-      const json = (await res.json()) as { elements?: RawElement[] };
-      const seen = new Set<string>();
-      const out: OverpassVenue[] = [];
-      for (const el of json.elements ?? []) {
-        const v = normalize(el);
-        if (!v || !v.osmId || seen.has(v.osmId)) continue;
-        seen.add(v.osmId);
-        out.push(v);
-      }
-      if (out.length > 0) return out;
-    } catch (err) {
-      overpassError = err;
-    } finally {
-      clearTimeout(timer);
+  const merged: OverpassVenue[] = [];
+  const seen = new Set<string>();
+  const add = (list: OverpassVenue[]) => {
+    for (const v of list) {
+      const byKey = dedupeKey(v);
+      const byId = v.osmId ?? byKey;
+      if (seen.has(byId) || seen.has(byKey)) continue;
+      seen.add(byId);
+      seen.add(byKey);
+      merged.push(v);
     }
-  }
+  };
+  if (photon.status === 'fulfilled') add(photon.value);
+  if (overpass.status === 'fulfilled') add(overpass.value);
 
-  throw new Error(
-    `OSM discovery unreachable (Photon: ${
-      photonError instanceof Error ? photonError.message : 'empty'
-    }; Overpass: ${overpassError instanceof Error ? overpassError.message : 'empty'})`,
-  );
+  if (merged.length === 0) {
+    throw new Error(
+      `OSM discovery unreachable (Photon: ${
+        photon.status === 'rejected' ? String(photon.reason) : 'empty'
+      }; Overpass: ${
+        overpass.status === 'rejected' ? String(overpass.reason) : 'empty'
+      })`,
+    );
+  }
+  return merged.slice(0, limit);
 }
