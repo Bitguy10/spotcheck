@@ -140,7 +140,17 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
       // pulled them.
       const category = filtersRef.current.category;
       const result = await backend.syncFromOSM(centerRef.current, radiusM, category);
-      const rows = await backend.fetchVenues(centerRef.current, radiusM);
+      let rows: VenueWithVibe[];
+      try {
+        rows = await backend.fetchVenues(centerRef.current, radiusM);
+      } catch {
+        // The pull itself saved — only the refetch died. Say so honestly
+        // instead of claiming total failure.
+        setSyncNote(
+          `${result.inserted} venue${result.inserted === 1 ? '' : 's'} saved to SpotCheck — the list couldn't refresh on this connection. Pull again or refresh.`,
+        );
+        return;
+      }
       rememberVenues(
         `${roundCoord(centerRef.current.lat)},${roundCoord(centerRef.current.lng)},${radiusM}`,
         rows,

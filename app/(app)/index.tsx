@@ -63,7 +63,7 @@ export default function Dashboard() {
   const querySuppressed = !!explore && filters.query.trim() === explore.query;
   const effectiveFilters = querySuppressed ? { ...filters, query: '' } : filters;
 
-  const { venues, visible, loading, refresh, syncFromOSM, syncing, syncNote } = useVenues(
+  const { venues, visible, loading, error, refresh, syncFromOSM, syncing, syncNote } = useVenues(
     center,
     radiusM,
     effectiveFilters,
@@ -160,6 +160,24 @@ export default function Dashboard() {
       {searchNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{searchNote}</Text> : null}
       {syncNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{syncNote}</Text> : null}
 
+      {error && displayed.length === 0 && !loading ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <Logo size={40} animate={false} />
+          <Text style={{ color: theme.muted, fontSize: 14, marginTop: 14, textAlign: 'center' }}>
+            Couldn’t load places near you — check your connection.
+          </Text>
+          <Pressable onPress={refresh} style={{ marginTop: 12, backgroundColor: theme.spectrum[0], borderRadius: 12, paddingVertical: 10, paddingHorizontal: 22 }}>
+            <Text style={{ color: '#0B1114', fontWeight: '700', fontSize: 13 }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : null}
+
+      {error && displayed.length > 0 ? (
+        <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>
+          Couldn’t refresh just now — showing your saved list.
+        </Text>
+      ) : null}
+
       {loading && displayed.length === 0 ? (
         <View>
           {[0, 1, 2].map((i) => (
@@ -222,7 +240,7 @@ export default function Dashboard() {
         </View>
       ) : null}
 
-      {displayed.length === 0 && !loading ? (
+      {displayed.length === 0 && !loading && !error ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
           <Logo size={40} animate={false} />
           <Text style={{ color: theme.muted, fontSize: 14, marginTop: 14, textAlign: 'center' }}>
