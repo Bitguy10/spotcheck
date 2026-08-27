@@ -17,6 +17,7 @@ import { VibeMeter } from './VibeMeter';
 import { useTheme } from '@/theme/ThemeProvider';
 import { relativeTime, formatTtl } from '@/lib/time';
 import { formatDistanceShort } from '@/lib/geo';
+import { usePrefs } from '@/lib/prefs';
 import { MIN_CHECKINS_FOR_SCORE, vibeLabel } from '@/lib/vibe';
 import type { VenueWithVibe } from '@/lib/types';
 
@@ -38,6 +39,7 @@ type RowProps = {
 
 export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
   const { theme, vibeColor } = useTheme();
+  const prefs = usePrefs();
   const { score } = venue;
 
   const hasScore = score.value !== null;
@@ -84,7 +86,7 @@ export function PulseStripRow({ venue, onPress, now = Date.now() }: RowProps) {
         ) : null}
         <Text style={{ color: theme.muted, fontSize: 12 }}>
           {CATEGORY_EMOJI[venue.category] ?? '📍'}
-          {venue.distanceMeters != null ? ` · ${formatDistanceShort(venue.distanceMeters)}` : ''}
+          {venue.distanceMeters != null ? ` · ${formatDistanceShort(venue.distanceMeters, prefs.units)}` : ''}
         </Text>
       </View>
 

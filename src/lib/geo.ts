@@ -41,9 +41,26 @@ export function formatDistance(m: number): string {
   return `${(m / 1000).toFixed(1)} km`;
 }
 
-export function formatDistanceShort(m: number): string {
+export function formatDistanceShort(m: number, units: 'km' | 'mi' = 'km'): string {
+  if (units === 'mi') {
+    const ft = m * 3.28084;
+    if (ft < 950) return `${Math.round(ft / 10) * 10}ft`;
+    return `${(m / 1609.34).toFixed(1)}mi`;
+  }
   if (m < 950) return `${Math.round(m / 10) * 10}m`;
   return `${(m / 1000).toFixed(1)}km`;
+}
+
+/** Rough urban ETA (4.8 km/h walking, ~28 km/h driving in traffic). */
+export function travelEtaMinutes(m: number, mode: 'walk' | 'drive'): number {
+  const kmh = mode === 'walk' ? 4.8 : 28;
+  return Math.max(1, Math.round((m / 1000 / kmh) * 60));
+}
+
+/** Google Maps turn-by-turn deep link (works on web + native via Linking). */
+export function directionsUrl(dest: LatLng, mode: 'walk' | 'drive' | 'transit' = 'drive'): string {
+  const travelmode = mode === 'walk' ? 'walking' : mode === 'transit' ? 'transit' : 'driving';
+  return `https://www.google.com/maps/dir/?api=1&destination=${dest.lat},${dest.lng}&travelmode=${travelmode}`;
 }
 
 /** Very rough reverse-geocode label. Real area names come from Overpass. */

@@ -7,7 +7,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Platform, Pressable, ScrollView, Share, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import { Logo } from '@/components/Logo';
@@ -18,8 +18,11 @@ import { Screen } from '@/components/Screen';
 import { useTheme } from '@/theme/ThemeProvider';
 import { useVenueDetail } from '@/hooks/useVenueDetail';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useLocation } from '@/hooks/useLocation';
 import { useAuth } from '@/hooks/useAuth';
 import { getBackend } from '@/data/backend';
+import { distanceMeters, directionsUrl, formatDistanceShort, travelEtaMinutes } from '@/lib/geo';
+import { usePrefs } from '@/lib/prefs';
 import type { VibeHistory } from '@/lib/types';
 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -45,11 +48,20 @@ export default function VenueDetail() {
   const params = useLocalSearchParams<{ id: string }>();
   const { theme, vibeColor } = useTheme();
   const { user } = useAuth();
+  const location = useLocation();
+  const prefs = usePrefs();
   const favorites = useFavorites();
   const { venue, score, checkins, loading } = useVenueDetail(params.id);
   const [shareOpen, setShareOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [travelMode, setTravelMode] = useState<'walk' | 'drive'>('walk');
   const [history, setHistory] = useState<VibeHistory | null>(null);
+
+  const awayMeters = venue ? distanceMeters(location.coords, venue) : null;
+  const openDirections = () => {
+    if (!venue) return;
+    Linking.openURL(directionsUrl({ lat: venue.lat, lng: venue.lng }, travelMode)).catch(() => undefined);
+  };
 
   useEffect(() => {
     if (!params.id) return;
@@ -247,6 +259,57 @@ export default function VenueDetail() {
         ) : null}
 
         {/* recent check-ins mini-feed */}
+        {/* getting there */}
+        {venue ? (
+          <View style={{ marginTop: 20, backgroundColor: theme.card, borderRadius: 22, borderWidth: 1, borderColor: theme.line, padding: 18 }}>
+            <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>Getting there</Text>
+            <Text style={{ color: theme.muted, fontSize: 13, marginTop: 6 }}>
+              {venue.address ?? `${venue.lat.toFixed(4)}, ${venue.lng.toFixed(4)}`}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              {awayMeters != null ? (
+                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+                  {formatDistanceShort(awayMeters, prefs.units)} away
+                </Text>
+              ) : null}
+              {awayMeters != null ? (
+                <>
+                  <Text style={{ color: theme.faint, fontSize: 13 }}>·</Text>
+                  {(['walk', 'drive'] as const).map((m) => (
+                    <Pressable
+                      key={m}
+                      onPress={() => setTravelMode(m)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: travelMode === m ? theme.spectrum[0] : theme.line,
+                        backgroundColor: travelMode === m ? `${theme.spectrum[0]}18` : 'transparent',
+                      }}
+                    >
+                      <Text style={{ color: travelMode === m ? theme.spectrum[0] : theme.muted, fontSize: 12, fontWeight: travelMode === m ? '700' : '500' }}>
+                        {m === 'walk' ? '🚶' : '🚗'} ~{travelEtaMinutes(awayMeters, m)} min
+                      </Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+            </View>
+            <Pressable
+              onPress={openDirections}
+              style={{ marginTop: 14, backgroundColor: theme.spectrum[0], borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
+            >
+              <Text style={{ color: '#0B1114', fontWeight: '700', fontSize: 14 }}>
+                Directions{travelMode === 'walk' ? ' · walk' : ' · drive'} ↗
+              </Text>
+            </Pressable>
+            <Text style={{ color: theme.faint, fontSize: 11, marginTop: 8 }}>
+              Opens in Google Maps for turn-by-turn navigation.
+            </Text>
+          </View>
+        ) : null}
+
         <View style={{ marginTop: 20 }}>
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, marginBottom: 10 }}>Recent check-ins</Text>
           {checkins.length === 0 ? (

@@ -22,7 +22,10 @@ import { useLocation } from '@/hooks/useLocation';
 import { useVenues } from '@/hooks/useVenues';
 import { useFavorites } from '@/hooks/useFavorites';
 import { getBackend } from '@/data/backend';
+import { geocodePlace } from '@/data/overpass';
 import { DEFAULT_FILTERS, type VenueFilters } from '@/lib/types';
+import { usePrefs } from '@/lib/prefs';
+import { formatDistanceShort, type LatLng } from '@/lib/geo';
 
 const isWeb = Platform.OS === 'web';
 
@@ -44,15 +47,35 @@ export default function Dashboard() {
   const [view, setView] = useState<'list' | 'map'>('list');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [savedOnly, setSavedOnly] = useState(false);
+  const prefs = usePrefs();
   const [radiusOverride, setRadiusOverride] = useState<number | null>(null);
-  const radiusM = radiusOverride ?? location.radiusM;
+  const radiusM = radiusOverride ?? prefs.radiusM;
+  const [explore, setExplore] = useState<(LatLng & { label: string }) | null>(null);
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  const [exploring, setExploring] = useState(false);
+  const center = explore ?? location.coords;
   const favorites = useFavorites();
 
   const { venues, visible, loading, refresh, syncFromOSM, syncing, syncNote } = useVenues(
-    location.coords,
+    center,
     radiusM,
     filters,
   );
+
+  async function explorePlace() {
+    const q = filters.query.trim();
+    if (!q) return;
+    setExploring(true);
+    setSearchNote(null);
+    const g = await geocodePlace(q);
+    setExploring(false);
+    if (g) {
+      setExplore(g);
+      setRadiusOverride(null);
+    } else {
+      setSearchNote(`Couldn’t find “${q}” on the map.`);
+    }
+  }
 
   const displayed = savedOnly ? visible.filter((v) => favorites.ids.includes(v.id)) : visible;
 
@@ -63,6 +86,9 @@ export default function Dashboard() {
     }
     return best;
   }, [venues]);
+
+  // Sticky check-in only when you're genuinely standing next to a venue.
+  const near = !!nearest && nearest.distanceMeters != null && nearest.distanceMeters <= 200;
 
   const openVenue = (id: string) => {
     setSelectedId(id);
@@ -94,13 +120,25 @@ export default function Dashboard() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={theme.muted} />}
       showsVerticalScrollIndicator={!isWeb}
     >
+      {explore ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <Pressable
+            onPress={() => { setExplore(null); setSearchNote(null); }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: theme.spectrum[0], borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 }}
+          >
+            <Text style={{ color: theme.spectrum[0], fontSize: 12, fontWeight: '700' }}>↩︎ Back to {location.areaLabel}</Text>
+          </Pressable>
+          <Text style={{ color: theme.faint, fontSize: 11, flex: 1 }} numberOfLines={1}>Exploring {explore.label}</Text>
+        </View>
+      ) : null}
+      {searchNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{searchNote}</Text> : null}
       {syncNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{syncNote}</Text> : null}
 
       {displayed.length === 0 && !loading ? (
         <View style={{ paddingVertical: 40, alignItems: 'center' }}>
           <Logo size={40} animate={false} />
           <Text style={{ color: theme.muted, fontSize: 14, marginTop: 14, textAlign: 'center' }}>
-            Nothing within {Math.round(radiusM / 100) / 10} km yet.
+            Nothing within {Math.round(radiusM / 100) / 10} km {explore ? `around ${explore.label}` : 'around you'} yet.
           </Text>
           <Pressable onPress={syncFromOSM} style={{ marginTop: 12, borderWidth: 1, borderColor: theme.line, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 }} disabled={syncing}>
             <Text style={{ color: theme.spectrum[0], fontWeight: '600', fontSize: 13 }}>
@@ -110,6 +148,13 @@ export default function Dashboard() {
           {radiusM < 5000 ? (
             <Pressable onPress={() => setRadiusOverride(5000)} style={{ marginTop: 8, paddingVertical: 8, paddingHorizontal: 14 }}>
               <Text style={{ color: theme.muted, fontSize: 13 }}>Widen search to 5 km</Text>
+            </Pressable>
+          ) : null}
+          {filters.query.trim() ? (
+            <Pressable onPress={explorePlace} disabled={exploring} style={{ marginTop: 10, backgroundColor: theme.spectrum[0], borderRadius: 12, paddingVertical: 10, paddingHorizontal: 20 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 13 }}>
+                {exploring ? 'Finding…' : `Explore “${filters.query.trim()}”`}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -122,11 +167,11 @@ export default function Dashboard() {
   const map = (
     <VibeMap
       venues={displayed.slice(0, 60)}
-      center={location.coords}
+      center={center}
       radiusM={radiusM}
       selectedId={selectedId}
       onSelect={openVenue}
-      style={{ flex: 1, borderWidth: 1, borderColor: theme.line }}
+      style={{ flex: 1, borderWidth: 1, borderColor: theme.line, marginBottom: near ? 92 : 0 }}
     />
   );
 
@@ -139,7 +184,7 @@ export default function Dashboard() {
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontFamily: 'SpaceGroteskBold', fontSize: 17 }}>SpotCheck</Text>
             <Text style={{ color: theme.muted, fontSize: 11 }} numberOfLines={1}>
-              Near you: {location.areaLabel}
+              {explore ? `Exploring: ${explore.label}` : `Near you: ${location.areaLabel}`}
             </Text>
           </View>
           <Pressable onPress={() => router.push('/settings' as never)} style={{ padding: 6 }}>
@@ -153,10 +198,17 @@ export default function Dashboard() {
           <TextInput
             value={filters.query}
             onChangeText={(q) => setFilters((f) => ({ ...f, query: q }))}
-            placeholder="Search venues, categories…"
+            onSubmitEditing={explorePlace}
+            returnKeyType="search"
+            placeholder="Search venues, areas…"
             placeholderTextColor={theme.faint}
             style={{ flex: 1, color: theme.text, fontSize: 14 }}
           />
+          {filters.query.trim() && !explore ? (
+            <Pressable onPress={explorePlace} disabled={exploring} hitSlop={8}>
+              <Text style={{ color: theme.spectrum[0], fontSize: 12, fontWeight: '700' }}>Explore ⏎</Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
@@ -209,27 +261,31 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* sticky check-in bar */}
-      <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18, paddingTop: 10 }}>
-        <Pressable
-          disabled={!nearest}
-          onPress={() => nearest && router.push(`/(app)/checkin/${nearest.id}` as never)}
-          style={{
-            backgroundColor: nearest ? theme.spectrum[2] : theme.line,
-            borderRadius: 16,
-            paddingVertical: 16,
-            alignItems: 'center',
-            shadowColor: '#000',
-            shadowOpacity: 0.25,
-            shadowRadius: 12,
-            shadowOffset: { width: 0, height: 4 },
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
-            {nearest ? `Check in here · ${nearest.name}` : 'No venue nearby'}
-          </Text>
-        </Pressable>
-      </View>
+      {/* sticky check-in bar — only when a venue is within ~200 m, so map controls stay clear */}
+      {near && nearest ? (
+        <View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 16, paddingBottom: 18, paddingTop: 10 }}>
+          <Pressable
+            onPress={() => router.push(`/(app)/checkin/${nearest.id}` as never)}
+            style={{
+              backgroundColor: theme.spectrum[2],
+              borderRadius: 16,
+              paddingVertical: 16,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOpacity: 0.25,
+              shadowRadius: 12,
+              shadowOffset: { width: 0, height: 4 },
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
+              Check in here · {nearest.name}
+            </Text>
+            <Text style={{ color: '#ffffffcc', fontSize: 12, marginTop: 2 }}>
+              {formatDistanceShort(nearest.distanceMeters ?? 0, prefs.units)} away
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* create-event modal (wave 3) */}
       <Modal transparent visible={eventOpen} animationType="fade" onRequestClose={() => setEventOpen(false)}>

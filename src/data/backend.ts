@@ -78,6 +78,11 @@ export interface SpotCheckBackend {
 
   /** "1,247 vibe checks today" — the landing page's liveness proof. */
   countToday(): Promise<number>;
+
+  /* settings wave: cache hygiene + account self-service */
+  purgeCache(center: LatLng, radiusM: number): Promise<number>;
+  changePassword(newPassword: string): Promise<{ ok: boolean; message?: string }>;
+  deleteAccount(): Promise<{ ok: boolean; message?: string }>;
 }
 
 let instance: SpotCheckBackend | null = null;

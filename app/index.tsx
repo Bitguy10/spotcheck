@@ -46,7 +46,7 @@ function useLandingData() {
 
 export default function Landing() {
   const { theme } = useTheme();
-  const { user, mode, signOut } = useAuth();
+  const { user, mode } = useAuth();
   const { location, venues, live } = useLandingData();
   const { width } = useWindowDimensions();
   // Real viewport responsiveness (works on phones, tablets, resized browser
@@ -76,8 +76,8 @@ export default function Landing() {
               <Text style={{ color: theme.faint, fontSize: 11, marginRight: 12 }}>demo mode</Text>
             ) : null}
             {user ? (
-              <Pressable onPress={() => signOut()}>
-                <Text style={{ color: theme.muted, fontSize: 13 }}>Sign out</Text>
+              <Pressable onPress={() => router.push('/(app)' as never)}>
+                <Text style={{ color: theme.spectrum[0], fontSize: 13, fontWeight: '700' }}>Open app →</Text>
               </Pressable>
             ) : (
               <Pressable onPress={() => router.push('/(auth)/login' as never)}>
@@ -228,7 +228,7 @@ export default function Landing() {
                   elevation: 3,
                 }}
               >
-                <Image source={img} style={{ height: wide ? 170 : 190, borderRadius: 12 }} resizeMode="cover" />
+                <Image source={img} style={{ width: '100%', height: wide ? 170 : 190, borderRadius: 12 }} resizeMode="cover" />
                 <View
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 4 }}
                 >

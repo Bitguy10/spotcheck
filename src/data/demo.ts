@@ -503,6 +503,19 @@ class DemoBackend implements SpotCheckBackend {
     hourAgg.forEach((v, k) => (byHour[k] = Math.round((v.s / v.n) * 10) / 10));
     return { byDay, byHour, sampleSize: sample };
   }
+
+  async purgeCache(_center: LatLng, _radiusM: number): Promise<number> {
+    return 0;
+  }
+
+  async changePassword(_newPassword: string): Promise<{ ok: boolean; message?: string }> {
+    return { ok: true };
+  }
+
+  async deleteAccount(): Promise<{ ok: boolean; message?: string }> {
+    await this.signOut();
+    return { ok: true };
+  }
 }
 
 export const demoBackend = new DemoBackend();

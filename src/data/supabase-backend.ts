@@ -427,6 +427,30 @@ class SupabaseBackend implements SpotCheckBackend {
     if (d?.id) return { ok: true, id: d.id };
     return { ok: false, code: d?.code ?? 'network' };
   }
+
+  /* -- settings wave: cache hygiene + account self-service ------------ */
+
+  async purgeCache(center: LatLng, radiusM: number): Promise<number> {
+    const { data, error } = await this.sb.rpc('purge_osm_cache', {
+      p_lat: center.lat,
+      p_lng: center.lng,
+      p_radius_m: radiusM,
+    });
+    if (error) throw new Error(error.message);
+    return Number(data ?? 0);
+  }
+
+  async changePassword(newPassword: string): Promise<{ ok: boolean; message?: string }> {
+    const { error } = await this.sb.auth.updateUser({ password: newPassword });
+    return error ? { ok: false, message: error.message } : { ok: true };
+  }
+
+  async deleteAccount(): Promise<{ ok: boolean; message?: string }> {
+    const { error } = await this.sb.rpc('delete_own_account');
+    if (error) return { ok: false, message: error.message };
+    await this.sb.auth.signOut();
+    return { ok: true };
+  }
 }
 
 export const supabaseBackend = new SupabaseBackend();

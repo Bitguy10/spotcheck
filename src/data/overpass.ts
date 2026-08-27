@@ -148,6 +148,30 @@ async function fetchPhotonVenues(center: LatLng, radiusM: number): Promise<Overp
   return out;
 }
 
+/** Geocode a free-text place ("Ikeja") so discovery can move there. */
+export async function geocodePlace(q: string): Promise<(LatLng & { label: string }) | null> {
+  try {
+    const res = await fetch(`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=1`, {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return null;
+    const j = (await res.json()) as {
+      features?: Array<{
+        geometry?: { coordinates?: [number, number] };
+        properties?: { name?: string; city?: string; country?: string };
+      }>;
+    };
+    const f = j.features?.[0];
+    const [lng, lat] = f?.geometry?.coordinates ?? [];
+    if (lat == null || lng == null) return null;
+    const p = f?.properties ?? {};
+    const label = [p.name ?? q, p.city ?? p.country].filter(Boolean).slice(0, 2).join(', ');
+    return { lat, lng, label };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Discover venues: Photon first (fast, CORS-open, reliable), Overpass second
  * (richer — ways + more categories — but its public mirrors are often slow or
