@@ -160,6 +160,24 @@ export default function Dashboard() {
       {searchNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{searchNote}</Text> : null}
       {syncNote ? <Text style={{ color: theme.faint, fontSize: 12, marginBottom: 8 }}>{syncNote}</Text> : null}
 
+      {loading && displayed.length === 0 ? (
+        <View>
+          {[0, 1, 2].map((i) => (
+            <View
+              key={i}
+              style={{ backgroundColor: theme.card, borderWidth: 1, borderColor: theme.line, borderRadius: 18, padding: 14, marginBottom: 10 }}
+            >
+              <View style={{ height: 14, width: '60%', borderRadius: 7, backgroundColor: theme.line }} />
+              <View style={{ height: 9, borderRadius: 5, backgroundColor: theme.line, marginTop: 12 }} />
+              <View style={{ height: 10, width: '40%', borderRadius: 5, backgroundColor: theme.line, marginTop: 10 }} />
+            </View>
+          ))}
+          <Text style={{ color: theme.faint, fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+            Reading the room near you…
+          </Text>
+        </View>
+      ) : null}
+
       {displayed.length > 0 ? (
         <View style={{ marginBottom: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
@@ -174,6 +192,7 @@ export default function Dashboard() {
               <Text style={{ color: theme.faint, fontSize: 11 }}>quiet right now — a check-in starts a vibe</Text>
             )}
             <Text style={{ color: theme.faint, fontSize: 11, marginLeft: 'auto' }}>
+              {loading ? 'refreshing… · ' : ''}
               {displayed.length} place{displayed.length === 1 ? '' : 's'}
             </Text>
           </View>

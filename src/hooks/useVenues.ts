@@ -10,6 +10,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { getBackend } from '@/data/backend';
 import { applyFilters } from '@/lib/filters';
+import { cachedVenues, cachedVenuesSync, rememberVenues } from '@/lib/venueCache';
 import type { LatLng } from '@/lib/geo';
 import type { Checkin, VenueFilters, VenueWithVibe } from '@/lib/types';
 import { computeVibeScore, type VibeScore } from '@/lib/vibe';
@@ -44,16 +45,28 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
-  /* -- initial load -------------------------------------------------- */
+  /* -- initial load (stale-while-revalidate) -------------------------- */
   useEffect(() => {
     let alive = true;
+    const key = `${roundCoord(center.lat)},${roundCoord(center.lng)},${radiusM}`;
     setLoading(true);
     setError(null);
+
+    // Instant paint: rows from a previous visit to this area, if we have them.
+    const inMem = cachedVenuesSync(key);
+    if (inMem) {
+      setVenues(inMem);
+    } else {
+      cachedVenues(key).then((rows) => {
+        if (alive && rows?.length) setVenues((prev) => (prev.length ? prev : rows));
+      });
+    }
 
     getBackend()
       .then((backend) => backend.fetchVenues(center, radiusM))
       .then((rows) => {
         if (!alive) return;
+        rememberVenues(key, rows);
         setVenues(rows);
         setLastUpdated(Date.now());
         setLoading(false);
@@ -128,6 +141,10 @@ export function useVenues(center: LatLng, radiusM: number, filters: VenueFilters
       const category = filtersRef.current.category;
       const result = await backend.syncFromOSM(centerRef.current, radiusM, category);
       const rows = await backend.fetchVenues(centerRef.current, radiusM);
+      rememberVenues(
+        `${roundCoord(centerRef.current.lat)},${roundCoord(centerRef.current.lng)},${radiusM}`,
+        rows,
+      );
       setVenues(rows);
       setLastUpdated(Date.now());
       setSyncNote(
