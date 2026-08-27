@@ -7,8 +7,22 @@
  */
 
 import React, { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Image,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+
+import heroBg from '../assets/landing/hero-bg.jpg';
+import vibeChill from '../assets/landing/vibe-chill.jpg';
+import vibeModerate from '../assets/landing/vibe-moderate.jpg';
+import vibeHot from '../assets/landing/vibe-hot.jpg';
 
 import { Logo } from '@/components/Logo';
 import { PulseStripRow } from '@/components/PulseStripRow';
@@ -73,26 +87,42 @@ export default function Landing() {
           </View>
         </View>
 
-        {/* hero */}
-        <View
-          style={{
-            alignSelf: 'center',
-            width: '100%',
-            maxWidth: maxW,
-            paddingHorizontal: 20,
-            flexDirection: wide ? 'row' : 'column',
-            alignItems: wide ? 'center' : 'stretch',
-            gap: wide ? 40 : 24,
-            paddingTop: 32,
-          }}
-        >
+        {/* hero — full-bleed photographic band, always dark for legibility */}
+        <View style={{ position: 'relative', marginTop: 4, overflow: 'hidden' }}>
+          <Image
+            source={heroBg}
+            resizeMode="cover"
+            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+          />
+          <LinearGradient
+            colors={['rgba(10,11,15,0.32)', 'rgba(10,11,15,0.5)', 'rgba(10,11,15,0.3)']}
+            locations={[0, 0.5, 1]}
+            style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+          />
+          <LinearGradient
+            colors={[theme.bg + '00', theme.bg]}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 72 }}
+          />
+          <View
+            style={{
+              alignSelf: 'center',
+              width: '100%',
+              maxWidth: maxW,
+              paddingHorizontal: 20,
+              flexDirection: wide ? 'row' : 'column',
+              alignItems: wide ? 'center' : 'stretch',
+              gap: wide ? 40 : 24,
+              paddingTop: 48,
+              paddingBottom: 64,
+            }}
+          >
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.spectrum[0], fontSize: 12, fontWeight: '700', letterSpacing: 1.5 }}>
+            <Text style={{ color: '#4ECDC4', fontSize: 12, fontWeight: '700', letterSpacing: 1.5 }}>
               LIVE · CROWDSOURCED · DECAYS IN REAL TIME
             </Text>
             <Text
               style={{
-                color: theme.text,
+                color: '#F7F5F0',
                 fontFamily: 'SpaceGroteskBold',
                 fontSize: wide ? 44 : 34,
                 lineHeight: wide ? 48 : 40,
@@ -102,9 +132,9 @@ export default function Landing() {
             >
               Know the vibe before you walk in.
             </Text>
-            <Text style={{ color: theme.muted, fontSize: 16, lineHeight: 24, marginTop: 12 }}>
+            <Text style={{ color: 'rgba(247,245,240,0.78)', fontSize: 16, lineHeight: 24, marginTop: 12 }}>
               Star ratings remember 2019. SpotCheck tells you what a place feels like{' '}
-              <Text style={{ color: theme.text, fontWeight: '600' }}>right now</Text> — checked in at the
+              <Text style={{ color: '#F7F5F0', fontWeight: '600' }}>right now</Text> — checked in at the
               door by people who are actually there.
             </Text>
             <Pressable
@@ -120,14 +150,16 @@ export default function Landing() {
             >
               <Text style={{ color: '#0B1114', fontWeight: '700', fontSize: 16 }}>Check your first spot →</Text>
             </Pressable>
-            <Text style={{ color: theme.faint, fontSize: 12, marginTop: 10 }}>
+            <Text style={{ color: 'rgba(247,245,240,0.55)', fontSize: 12, marginTop: 10 }}>
               No reviews to read. Two taps. Under ten seconds.
             </Text>
           </View>
 
           {/* live pulse-strip demo */}
           <View style={{ width: wide ? 380 : '100%' }}>
-            <Text style={{ color: theme.muted, fontSize: 12, marginBottom: 8 }}>Happening near you</Text>
+            <Text style={{ color: 'rgba(247,245,240,0.7)', fontSize: 12, marginBottom: 8 }}>
+              Happening near you
+            </Text>
             {heroRows.length === 0 ? (
               <View style={{ backgroundColor: theme.card, borderRadius: 18, padding: 18, borderWidth: 1, borderColor: theme.line }}>
                 <Text style={{ color: theme.muted, fontSize: 13 }}>Listening for the first check-ins…</Text>
@@ -137,6 +169,7 @@ export default function Landing() {
                 <PulseStripRow key={v.id} venue={v} onPress={() => router.push(`/(app)/venue/${v.id}` as never)} />
               ))
             )}
+          </View>
           </View>
         </View>
 
@@ -166,6 +199,47 @@ export default function Landing() {
             <Text style={{ color: theme.muted, fontSize: 13 }}>vibe checks today · ticking live</Text>
           </View>
         </View>
+
+        {/* vibe spectrum collage */}
+        <Section title="Every vibe has a place" theme={theme}>
+          <View style={{ flexDirection: wide ? 'row' : 'column', gap: 14 }}>
+            {(
+              [
+                [vibeChill, '#4ECDC4', 'Chill', 'slow mornings, soft light', '-2deg'],
+                [vibeModerate, '#FFD166', 'Moderate', 'golden-hour tables', '1.6deg'],
+                [vibeHot, '#FF5A5F', 'Hot', 'peak-night floors', '-1.2deg'],
+              ] as const
+            ).map(([img, color, label, sub, rotate]) => (
+              <View
+                key={label}
+                style={{
+                  flex: 1,
+                  minWidth: wide ? 220 : undefined,
+                  backgroundColor: theme.card,
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: theme.line,
+                  padding: 10,
+                  transform: [{ rotate }],
+                  shadowColor: '#000',
+                  shadowOpacity: 0.14,
+                  shadowRadius: 14,
+                  shadowOffset: { width: 0, height: 6 },
+                  elevation: 3,
+                }}
+              >
+                <Image source={img} style={{ height: wide ? 170 : 190, borderRadius: 12 }} resizeMode="cover" />
+                <View
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 12, paddingBottom: 4, paddingHorizontal: 4 }}
+                >
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: color }} />
+                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14 }}>{label}</Text>
+                  <Text style={{ color: theme.muted, fontSize: 12, marginLeft: 'auto' }}>{sub}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </Section>
 
         {/* how it works */}
         <Section title="How it works" theme={theme}>
