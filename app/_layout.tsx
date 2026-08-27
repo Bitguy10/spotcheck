@@ -41,6 +41,49 @@ function Shell() {
     }
   }, [theme.bg]);
 
+  // Web self-updater: the SPA never refetches its own HTML, so a phone left
+  // open across a deploy keeps running the old bundle and "fixed" bugs look
+  // unfixed. Compare the served index.html bundle hash with the running one;
+  // when a new build exists, reload exactly once.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') return;
+    const current = [...document.querySelectorAll('script[src]')]
+      .map((s) => s.getAttribute('src') ?? '')
+      .find((src) => src.includes('/_expo/static/js/web/index-'));
+    const curHash = current?.match(/index-([a-f0-9]+)\.js/)?.[1];
+    if (!curHash) return;
+
+    let done = false;
+    const check = async () => {
+      if (done) return;
+      try {
+        const res = await fetch(`${window.location.origin}/?sc-upd=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const html = await res.text();
+        const latest = html.match(/index-([a-f0-9]+)\.js/)?.[1];
+        if (latest && latest !== curHash) {
+          done = true;
+          const key = 'sc-updated-to';
+          if (window.sessionStorage.getItem(key) !== latest) {
+            window.sessionStorage.setItem(key, latest);
+            window.location.reload();
+          }
+        }
+      } catch {
+        /* offline or blocked — keep running the current build */
+      }
+    };
+    const t = setTimeout(() => void check(), 4000);
+    const onVis = () => {
+      if (document.visibilityState === 'visible') void check();
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+
   if (!loaded) return null;
 
   return (
