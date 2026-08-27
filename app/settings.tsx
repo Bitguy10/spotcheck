@@ -15,7 +15,7 @@ import { APP_VERSION } from '@/lib/config';
 
 export default function Settings() {
   const { theme, preference, setPreference } = useTheme();
-  const { user, mode, signOut } = useAuth();
+  const { user, signOut } = useAuth();
 
   return (
     <Screen>
@@ -75,18 +75,6 @@ export default function Settings() {
               </Pressable>
             </View>
           )}
-        </View>
-
-        {/* data */}
-        <Text style={{ color: theme.muted, fontSize: 12, letterSpacing: 1, marginTop: 28, marginBottom: 10 }}>DATA</Text>
-        <View style={{ backgroundColor: theme.card, borderRadius: 14, borderWidth: 1, borderColor: theme.line, padding: 16 }}>
-          <Text style={{ color: theme.text, fontSize: 14 }}>
-            Backend: <Text style={{ fontWeight: '700' }}>{mode === 'demo' ? 'Demo (local, self-simulating)' : 'Supabase'}</Text>
-          </Text>
-          <Text style={{ color: theme.muted, fontSize: 13, marginTop: 8, lineHeight: 20 }}>
-            Venue seeds come from OpenStreetMap via Overpass and are cached locally — OSM is the seed source,
-            never a per-request dependency. Vibe scores decay over ~45 minutes and are always computed server-side.
-          </Text>
         </View>
 
         <View style={{ alignItems: 'center', marginTop: 36 }}>
